@@ -1,0 +1,30 @@
+{
+  "name": "frugal-router",
+  "version": "0.1.0",
+  "description": "Jev decides which model and how much effort each LLM request deserves. OpenAI-compatible proxy and library.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": { "frugal": "./dist/cli.js" },
+  "files": ["dist", "../models.json"],
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "serve": "tsx src/cli.ts serve",
+    "route": "tsx src/cli.ts route",
+    "models": "tsx src/cli.ts models",
+    "stats": "tsx src/cli.ts stats",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0",
+    "@typesafe-ai/sdk": "^0.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

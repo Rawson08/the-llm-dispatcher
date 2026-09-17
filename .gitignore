@@ -1,0 +1,26 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# ledgers (contain no prompt text, but are per-deployment data)
+*.jsonl
+
+# node
+node_modules/
+ts/dist/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# editors / os
+.idea/
+.DS_Store
+Thumbs.db
+
+# windows reserved device names accidentally created by /dev/null redirects
+nul
