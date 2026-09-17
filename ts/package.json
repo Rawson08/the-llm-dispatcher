@@ -1,12 +1,12 @@
 {
-  "name": "frugal-router",
+  "name": "the-llm-dispatcher",
   "version": "0.1.0",
-  "description": "Jev decides which model and how much effort each LLM request deserves. OpenAI-compatible proxy and library.",
+  "description": "An LLM router that uses Jev (TypeSafe System One) to dispatch each request to the cheapest model and lowest reasoning effort that will do the job. OpenAI-compatible proxy and library.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "frugal": "./dist/cli.js" },
+  "bin": { "llm-dispatcher": "./dist/cli.js" },
   "files": ["dist", "../models.json"],
   "engines": { "node": ">=20.12" },
   "scripts": {

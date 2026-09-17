@@ -5,11 +5,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <OutputType>Exe</OutputType>
-    <AssemblyName>frugal</AssemblyName>
-    <RootNamespace>Frugal</RootNamespace>
+    <AssemblyName>llm-dispatcher</AssemblyName>
+    <RootNamespace>LlmDispatcher</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <Description>Jev decides which model and how much effort each LLM request deserves. OpenAI-compatible proxy and library.</Description>
+    <Description>An LLM router that uses Jev (TypeSafe System One) to dispatch each request to the cheapest model and lowest reasoning effort that will do the job. OpenAI-compatible proxy and library.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Frugal.Tests" />
+    <InternalsVisibleTo Include="Dispatcher.Tests" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
-namespace Frugal;
+namespace LlmDispatcher;
 
 public sealed class PolicyOptions
 {
-    /// <summary>Model the client would have used without frugal; defaults to the priciest frontier model.</summary>
+    /// <summary>Model the client would have used without dispatcher; defaults to the priciest frontier model.</summary>
     public string? BaselineId { get; set; }
     public double WeightDifficulty { get; set; } = 0.55;
     public double WeightReasoning { get; set; } = 0.30;
@@ -79,7 +79,7 @@ public static class Policy
             rationale.Add($"no eligible model at tier {tier}; using best available (tier {best})");
         }
         if (pool.Count == 0)
-            throw new InvalidOperationException("frugal: no model satisfies the request (check provider keys, vision/tool support, context size)");
+            throw new InvalidOperationException("dispatcher: no model satisfies the request (check provider keys, vision/tool support, context size)");
 
         var winner = pool[0];
         var chosen = available.First(m => m.Id == winner.Id);

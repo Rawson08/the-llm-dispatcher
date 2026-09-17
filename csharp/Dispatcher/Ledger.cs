@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Frugal;
+namespace LlmDispatcher;
 
 public sealed class LedgerEntry
 {

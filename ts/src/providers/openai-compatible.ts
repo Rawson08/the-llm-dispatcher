@@ -1,5 +1,5 @@
 import type { ChatRequest, ChatResponse, Effort, ModelSpec } from "../types.js";
-import { type ChatChunk, FRUGAL_ONLY_FIELDS, type Provider, UpstreamError } from "./types.js";
+import { type ChatChunk, DISPATCHER_ONLY_FIELDS, type Provider, UpstreamError } from "./types.js";
 
 export interface OpenAICompatibleOptions {
   name: string;
@@ -29,7 +29,7 @@ export class OpenAICompatibleProvider implements Provider {
 
   private body(req: ChatRequest, spec: ModelSpec, effort: Effort | undefined, stream: boolean): Record<string, unknown> {
     const body: Record<string, unknown> = { ...req, model: spec.model, stream };
-    for (const k of FRUGAL_ONLY_FIELDS) delete body[k];
+    for (const k of DISPATCHER_ONLY_FIELDS) delete body[k];
     if (effort && spec.effort.length) body.reasoning_effort = effort;
     else delete body.reasoning_effort;
     if (this.o.useMaxCompletionTokens && body.max_tokens !== undefined && body.max_completion_tokens === undefined) {
@@ -101,6 +101,6 @@ export function openrouterProvider(): OpenAICompatibleProvider {
     name: "openrouter",
     baseURL: "https://openrouter.ai/api/v1",
     apiKeyEnv: "OPENROUTER_API_KEY",
-    extraHeaders: { "HTTP-Referer": "https://github.com/frugal-router", "X-Title": "frugal" },
+    extraHeaders: { "HTTP-Referer": "https://github.com/the-llm-dispatcher", "X-Title": "dispatcher" },
   });
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { loadEnv } from "./env.js";
-import { Frugal } from "./router.js";
+import { Dispatcher } from "./router.js";
 import { startServer } from "./server.js";
 import { summarize } from "./types.js";
 
@@ -12,16 +12,16 @@ async function main() {
   switch (cmd) {
     case "serve": {
       const port = flag(rest, "--port");
-      startServer(new Frugal(), port ? Number(port) : undefined);
+      startServer(new Dispatcher(), port ? Number(port) : undefined);
       return;
     }
     case "route": {
       const text = rest.filter((a) => !a.startsWith("--")).join(" ");
       if (!text) return usage("route needs a prompt");
-      let f = new Frugal({ ledgerPath: null });
+      let f = new Dispatcher({ ledgerPath: null });
       if (f.available().length === 0) {
         console.error("(no provider keys configured; dry run against the full catalog)");
-        f = new Frugal({ ledgerPath: null, assumeAllProviders: true });
+        f = new Dispatcher({ ledgerPath: null, assumeAllProviders: true });
       }
       const d = await f.route({ model: "auto", messages: [{ role: "user", content: text }] });
       const s = summarize(d);
@@ -39,7 +39,7 @@ async function main() {
       return;
     }
     case "models": {
-      const f = new Frugal({ ledgerPath: null });
+      const f = new Dispatcher({ ledgerPath: null });
       const avail = new Set(f.available().map((m) => m.id));
       for (const m of f.catalog) {
         console.log(
@@ -50,7 +50,7 @@ async function main() {
       return;
     }
     case "stats": {
-      const f = new Frugal();
+      const f = new Dispatcher();
       console.log(JSON.stringify(f.ledger.stats(), null, 2));
       return;
     }
@@ -66,12 +66,12 @@ function flag(args: string[], name: string): string | undefined {
 
 function usage(msg?: string) {
   if (msg) console.error(`error: ${msg}\n`);
-  console.log(`frugal — Jev decides which model and how much effort each LLM request deserves
+  console.log(`the-llm-dispatcher — an LLM router: Jev (TypeSafe System One) decides which model and how much reasoning effort each request deserves
 
-  frugal serve [--port 8787]     start the OpenAI-compatible proxy
-  frugal route "<prompt>" [--json]  dry run: show the decision for a prompt
-  frugal models                  list the catalog and which providers have keys
-  frugal stats                   cost ledger totals
+  llm-dispatcher serve [--port 8787]     start the OpenAI-compatible proxy
+  llm-dispatcher route "<prompt>" [--json]  dry run: show the decision for a prompt
+  llm-dispatcher models                  list the catalog and which providers have keys
+  llm-dispatcher stats                   cost ledger totals
 
 Keys are read from .env (TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY).`);
   if (msg) process.exit(2);

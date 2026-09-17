@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace Frugal.Providers;
+namespace LlmDispatcher.Providers;
 
 /// <summary>
 /// A downstream LLM provider. Both methods take the client's OpenAI-style request and return

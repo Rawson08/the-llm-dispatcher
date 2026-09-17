@@ -10,7 +10,7 @@ import type { ChatChunk, Provider } from "./providers/types.js";
 import type { ChatRequest, ChatResponse, Decision, Effort, ModelSpec, ProviderName, Tier } from "./types.js";
 import { EFFORT_LADDER, summarize } from "./types.js";
 
-export interface FrugalConfig {
+export interface DispatcherConfig {
   catalog?: ModelSpec[];
   judge?: Judge;
   ledgerPath?: string | null;
@@ -20,7 +20,7 @@ export interface FrugalConfig {
   fallbackId?: string;
   /** Route every request, even ones naming a concrete model. */
   routeAll?: boolean;
-  /** Model names that mean "let frugal decide". */
+  /** Model names that mean "let dispatcher decide". */
   aliases?: string[];
   policy?: PolicyOptions;
   providers?: Partial<Record<ProviderName, Provider>>;
@@ -28,28 +28,28 @@ export interface FrugalConfig {
   assumeAllProviders?: boolean;
 }
 
-/** Per-request knobs a client may send in the body under `frugal_options`. */
+/** Per-request knobs a client may send in the body under `dispatcher_options`. */
 export interface RequestOptions {
   baseline?: string;
   min_tier?: Tier;
   max_tier?: Tier;
 }
 
-export class Frugal {
+export class Dispatcher {
   readonly catalog: ModelSpec[];
   readonly judge: Judge;
   readonly ledger: Ledger;
   readonly aliases: Set<string>;
-  private readonly cfg: FrugalConfig;
+  private readonly cfg: DispatcherConfig;
   private readonly providers: Record<ProviderName, Provider>;
 
-  constructor(cfg: FrugalConfig = {}) {
+  constructor(cfg: DispatcherConfig = {}) {
     this.cfg = cfg;
     this.catalog = cfg.catalog ?? loadCatalog();
     this.judge = cfg.judge ?? new Judge();
-    const ledgerPath = cfg.ledgerPath === undefined ? (process.env[ENV.ledger] ?? "frugal-ledger.jsonl") : cfg.ledgerPath;
+    const ledgerPath = cfg.ledgerPath === undefined ? (process.env[ENV.ledger] ?? "dispatcher-ledger.jsonl") : cfg.ledgerPath;
     this.ledger = new Ledger(ledgerPath ?? undefined);
-    this.aliases = new Set((cfg.aliases ?? ["auto", "frugal", "frugal/auto"]).map((a) => a.toLowerCase()));
+    this.aliases = new Set((cfg.aliases ?? ["auto", "dispatcher", "the-llm-dispatcher/auto"]).map((a) => a.toLowerCase()));
     this.providers = {
       anthropic: cfg.providers?.anthropic ?? new AnthropicProvider(),
       openai: cfg.providers?.openai ?? openaiProvider(),
@@ -70,12 +70,12 @@ export class Frugal {
   async route(req: ChatRequest): Promise<Decision> {
     const features = extractFeatures(req);
     const available = this.available();
-    if (available.length === 0) throw new Error("frugal: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
-    const ropts = (req.frugal_options ?? {}) as RequestOptions;
+    if (available.length === 0) throw new Error("dispatcher: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
+    const ropts = (req.dispatcher_options ?? {}) as RequestOptions;
 
     if (!this.shouldRoute(req.model)) {
       const spec = findModel(available, req.model);
-      if (!spec) throw new Error(`frugal: unknown model "${req.model}". Use "auto" or one of: ${available.map((m) => m.id).join(", ")}`);
+      if (!spec) throw new Error(`dispatcher: unknown model "${req.model}". Use "auto" or one of: ${available.map((m) => m.id).join(", ")}`);
       return this.passthrough(spec, features.inputTokens, req);
     }
 
@@ -94,7 +94,7 @@ export class Frugal {
         decision.tier = spec.tier;
         decision.estimate.cost = estimateCost(spec, decision.estimate.inputTokens, decision.estimate.outputTokens, decision.effort);
         decision.estimate.savings = Math.max(0, decision.estimate.baselineCost - decision.estimate.cost);
-        decision.rationale.push(`FRUGAL_FALLBACK -> ${spec.id}`);
+        decision.rationale.push(`DISPATCHER_FALLBACK -> ${spec.id}`);
       }
     }
     return decision;
@@ -128,7 +128,7 @@ export class Frugal {
     const started = Date.now();
     try {
       const response = await provider.complete(req, d.model, d.effort);
-      response.frugal = summarize(d);
+      response.dispatcher = summarize(d);
       this.ledger.record(d, {
         inputTokens: response.usage?.prompt_tokens ?? d.estimate.inputTokens,
         outputTokens: response.usage?.completion_tokens ?? 0,
@@ -158,7 +158,7 @@ export class Frugal {
     try {
       for await (const chunk of provider.stream(req, d.model, d.effort)) {
         if (first) {
-          chunk.frugal = summarize(d);
+          chunk.dispatcher = summarize(d);
           first = false;
         }
         if (chunk.usage) usage = chunk.usage;

@@ -1,15 +1,15 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
-using Frugal.Providers;
+using LlmDispatcher.Providers;
 
-namespace Frugal;
+namespace LlmDispatcher;
 
-public sealed class FrugalConfig
+public sealed class DispatcherConfig
 {
     public List<ModelSpec>? Catalog { get; set; }
     public Judge? Judge { get; set; }
-    /// <summary>Null disables the ledger file; unset uses FRUGAL_LEDGER_PATH or frugal-ledger.jsonl.</summary>
+    /// <summary>Null disables the ledger file; unset uses DISPATCHER_LEDGER_PATH or dispatcher-ledger.jsonl.</summary>
     public string? LedgerPath { get; set; } = "";
     /// <summary>Model id that represents "what you would have used anyway".</summary>
     public string? BaselineId { get; set; }
@@ -17,8 +17,8 @@ public sealed class FrugalConfig
     public string? FallbackId { get; set; }
     /// <summary>Route every request, even ones naming a concrete model.</summary>
     public bool? RouteAll { get; set; }
-    /// <summary>Model names that mean "let frugal decide".</summary>
-    public string[] Aliases { get; set; } = ["auto", "frugal", "frugal/auto"];
+    /// <summary>Model names that mean "let dispatcher decide".</summary>
+    public string[] Aliases { get; set; } = ["auto", "dispatcher", "the-llm-dispatcher/auto"];
     public PolicyOptions Policy { get; set; } = new();
     public Dictionary<string, IProvider>? Providers { get; set; }
     /// <summary>Dry-run mode: treat every catalog model as available even without provider keys.</summary>
@@ -26,21 +26,21 @@ public sealed class FrugalConfig
 }
 
 /// <summary>Routes each request to a model and effort, calls the provider, and records the outcome.</summary>
-public sealed class FrugalRouter
+public sealed class Dispatcher
 {
     public IReadOnlyList<ModelSpec> CatalogModels { get; }
     public Judge Judge { get; }
     public Ledger Ledger { get; }
-    private readonly FrugalConfig _cfg;
+    private readonly DispatcherConfig _cfg;
     private readonly HashSet<string> _aliases;
     private readonly Dictionary<string, IProvider> _providers;
 
-    public FrugalRouter(FrugalConfig? cfg = null)
+    public Dispatcher(DispatcherConfig? cfg = null)
     {
-        _cfg = cfg ?? new FrugalConfig();
+        _cfg = cfg ?? new DispatcherConfig();
         CatalogModels = _cfg.Catalog ?? Catalog.Load();
         Judge = _cfg.Judge ?? new Judge();
-        var ledgerPath = _cfg.LedgerPath == "" ? Env.Get(Env.LedgerPath) ?? "frugal-ledger.jsonl" : _cfg.LedgerPath;
+        var ledgerPath = _cfg.LedgerPath == "" ? Env.Get(Env.LedgerPath) ?? "dispatcher-ledger.jsonl" : _cfg.LedgerPath;
         Ledger = new Ledger(ledgerPath);
         _aliases = new HashSet<string>(_cfg.Aliases.Select(a => a.ToLowerInvariant()));
         _providers = new Dictionary<string, IProvider>
@@ -62,13 +62,13 @@ public sealed class FrugalRouter
         var features = FeatureExtractor.Extract(req);
         var available = Available();
         if (available.Count == 0)
-            throw new InvalidOperationException("frugal: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
-        var ropts = req.FrugalOptions ?? new RequestOptions();
+            throw new InvalidOperationException("dispatcher: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
+        var ropts = req.DispatcherOptions ?? new RequestOptions();
 
         if (!ShouldRoute(req.Model))
         {
             var spec = Catalog.Find(available, req.Model)
-                ?? throw new InvalidOperationException($"frugal: unknown model \"{req.Model}\". Use \"auto\" or one of: {string.Join(", ", available.Select(m => m.Id))}");
+                ?? throw new InvalidOperationException($"dispatcher: unknown model \"{req.Model}\". Use \"auto\" or one of: {string.Join(", ", available.Select(m => m.Id))}");
             return Passthrough(spec, features.InputTokens, req);
         }
 
@@ -86,7 +86,7 @@ public sealed class FrugalRouter
             decision.Tier = fb.Tier;
             decision.Estimate.Cost = Policy.EstimateCost(fb, decision.Estimate.InputTokens, decision.Estimate.OutputTokens, decision.Effort);
             decision.Estimate.Savings = Math.Max(0, decision.Estimate.BaselineCost - decision.Estimate.Cost);
-            decision.Rationale.Add($"FRUGAL_FALLBACK -> {fb.Id}");
+            decision.Rationale.Add($"DISPATCHER_FALLBACK -> {fb.Id}");
         }
         return decision;
     }
@@ -119,7 +119,7 @@ public sealed class FrugalRouter
         try
         {
             var response = await provider.CompleteAsync(req, d.Model, d.Effort, ct);
-            response["frugal"] = d.Summary();
+            response["dispatcher"] = d.Summary();
             var usage = response["usage"] as JsonObject;
             Ledger.Record(d, new ActualUsage
             {
@@ -158,7 +158,7 @@ public sealed class FrugalRouter
             }
             if (!more) break;
             var chunk = e.Current;
-            if (first) { chunk["frugal"] = d.Summary(); first = false; }
+            if (first) { chunk["dispatcher"] = d.Summary(); first = false; }
             if (chunk["usage"] is JsonObject u) usage = u;
             yield return chunk;
         }

@@ -1,12 +1,12 @@
 /**
- * Loads `.env` from the working directory (or FRUGAL_ENV_FILE) into process.env
+ * Loads `.env` from the working directory (or DISPATCHER_ENV_FILE) into process.env
  * without overriding variables that are already set. Values are never logged.
  */
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 /** Looks in the working directory, then up to three parents (the repo root when run from ts/). */
-export function loadEnv(file = process.env.FRUGAL_ENV_FILE ?? ".env"): boolean {
+export function loadEnv(file = process.env.DISPATCHER_ENV_FILE ?? ".env"): boolean {
   let dir = process.cwd();
   for (let i = 0; i < 4; i++) {
     const path = resolve(dir, file);
@@ -26,21 +26,21 @@ export function loadEnv(file = process.env.FRUGAL_ENV_FILE ?? ".env"): boolean {
   return false;
 }
 
-/** Env names frugal reads. Only presence is ever reported, never values. */
+/** Env names dispatcher reads. Only presence is ever reported, never values. */
 export const ENV = {
   typesafe: "TYPESAFE_API_KEY",
   anthropic: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   openaiBaseURL: "OPENAI_BASE_URL",
   openrouter: "OPENROUTER_API_KEY",
-  port: "FRUGAL_PORT",
-  apiKey: "FRUGAL_API_KEY",
-  baseline: "FRUGAL_BASELINE",
-  fallback: "FRUGAL_FALLBACK",
-  routeAll: "FRUGAL_ROUTE_ALL",
-  ledger: "FRUGAL_LEDGER_PATH",
-  catalog: "FRUGAL_CATALOG",
-  jevTimeout: "FRUGAL_JEV_TIMEOUT_MS",
+  port: "DISPATCHER_PORT",
+  apiKey: "DISPATCHER_API_KEY",
+  baseline: "DISPATCHER_BASELINE",
+  fallback: "DISPATCHER_FALLBACK",
+  routeAll: "DISPATCHER_ROUTE_ALL",
+  ledger: "DISPATCHER_LEDGER_PATH",
+  catalog: "DISPATCHER_CATALOG",
+  jevTimeout: "DISPATCHER_JEV_TIMEOUT_MS",
 } as const;
 
 export function has(name: string): boolean {

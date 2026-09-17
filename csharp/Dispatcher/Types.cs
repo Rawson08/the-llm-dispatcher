@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace Frugal;
+namespace LlmDispatcher;
 
 /// <summary>Canonical effort ladder, lowest to highest. Providers support subsets.</summary>
 public static class Efforts
@@ -109,7 +109,7 @@ public sealed class ToolDef
     public ToolFunctionDef Function { get; set; } = new();
 }
 
-/// <summary>Per-request knobs a client may send under <c>frugal_options</c>.</summary>
+/// <summary>Per-request knobs a client may send under <c>dispatcher_options</c>.</summary>
 public sealed class RequestOptions
 {
     public string? Baseline { get; set; }
@@ -131,7 +131,7 @@ public sealed class ChatRequest
     public JsonElement? StreamOptions { get; set; }
     public string? ReasoningEffort { get; set; }
     public JsonElement? Stop { get; set; }
-    public RequestOptions? FrugalOptions { get; set; }
+    public RequestOptions? DispatcherOptions { get; set; }
 
     /// <summary>Anything else the client sent is preserved and forwarded untouched.</summary>
     [JsonExtensionData]

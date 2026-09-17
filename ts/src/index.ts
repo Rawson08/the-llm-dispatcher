@@ -1,5 +1,5 @@
-export { Frugal, type FrugalConfig, type RequestOptions } from "./router.js";
-export { createFrugalServer, startServer } from "./server.js";
+export { Dispatcher, type DispatcherConfig, type RequestOptions } from "./router.js";
+export { createDispatcherServer, startServer } from "./server.js";
 export { Judge, QUESTIONS, fallback } from "./judge.js";
 export { decide, desiredEffort, snapEffort, estimateCost, expectedOutputTokens, effectiveTier, type PolicyOptions } from "./policy.js";
 export { extractFeatures } from "./features.js";

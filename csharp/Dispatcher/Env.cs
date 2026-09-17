@@ -1,4 +1,4 @@
-namespace Frugal;
+namespace LlmDispatcher;
 
 /// <summary>
 /// Loads a <c>.env</c> file into the process environment without overriding variables that are
@@ -11,18 +11,18 @@ public static class Env
     public const string OpenAI = "OPENAI_API_KEY";
     public const string OpenAIBaseUrl = "OPENAI_BASE_URL";
     public const string OpenRouter = "OPENROUTER_API_KEY";
-    public const string Port = "FRUGAL_PORT";
-    public const string ApiKey = "FRUGAL_API_KEY";
-    public const string Baseline = "FRUGAL_BASELINE";
-    public const string Fallback = "FRUGAL_FALLBACK";
-    public const string RouteAll = "FRUGAL_ROUTE_ALL";
-    public const string LedgerPath = "FRUGAL_LEDGER_PATH";
-    public const string Catalog = "FRUGAL_CATALOG";
-    public const string JevTimeout = "FRUGAL_JEV_TIMEOUT_MS";
+    public const string Port = "DISPATCHER_PORT";
+    public const string ApiKey = "DISPATCHER_API_KEY";
+    public const string Baseline = "DISPATCHER_BASELINE";
+    public const string Fallback = "DISPATCHER_FALLBACK";
+    public const string RouteAll = "DISPATCHER_ROUTE_ALL";
+    public const string LedgerPath = "DISPATCHER_LEDGER_PATH";
+    public const string Catalog = "DISPATCHER_CATALOG";
+    public const string JevTimeout = "DISPATCHER_JEV_TIMEOUT_MS";
 
     public static bool Load(string? file = null)
     {
-        file ??= Environment.GetEnvironmentVariable("FRUGAL_ENV_FILE") ?? ".env";
+        file ??= Environment.GetEnvironmentVariable("DISPATCHER_ENV_FILE") ?? ".env";
         var dir = Directory.GetCurrentDirectory();
         for (var i = 0; i < 4 && dir is not null; i++)
         {

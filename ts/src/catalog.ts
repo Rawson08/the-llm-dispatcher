@@ -17,7 +17,7 @@ function defaultCatalogPath(): string {
   return candidates.find((p) => existsSync(p)) ?? candidates[0];
 }
 
-/** Load the default catalog shipped with frugal, or a user-supplied JSON file. */
+/** Load the default catalog shipped with dispatcher, or a user-supplied JSON file. */
 export function loadCatalog(path?: string): ModelSpec[] {
   const file = path ?? process.env[ENV.catalog] ?? defaultCatalogPath();
   const raw = JSON.parse(readFileSync(file, "utf8")) as { models?: ModelSpec[] } | ModelSpec[];

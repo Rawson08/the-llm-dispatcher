@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
-using Frugal;
-using Frugal.Providers;
+using LlmDispatcher;
+using LlmDispatcher.Providers;
 using Microsoft.AspNetCore.Http.Json;
 
 Env.Load();
@@ -22,7 +22,7 @@ switch (cmd)
         Models();
         break;
     case "stats":
-        Console.WriteLine(JsonSerializer.Serialize(new FrugalRouter().Ledger.GetStats(), new JsonSerializerOptions(Json.Wire) { WriteIndented = true }));
+        Console.WriteLine(JsonSerializer.Serialize(new Dispatcher().Ledger.GetStats(), new JsonSerializerOptions(Json.Wire) { WriteIndented = true }));
         break;
     default:
         Usage(cmd == "help" ? null : $"unknown command \"{cmd}\"");
@@ -43,7 +43,7 @@ void Serve(string[] a)
         o.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
     });
     var app = builder.Build();
-    var frugal = new FrugalRouter();
+    var dispatcher = new Dispatcher();
 
     app.Use(async (ctx, next) =>
     {
@@ -76,15 +76,15 @@ void Serve(string[] a)
         }
     });
 
-    app.MapGet("/health", () => Results.Json(new { ok = true, jev = frugal.Judge.Enabled }));
-    app.MapGet("/stats", () => Results.Json(frugal.Ledger.GetStats(), Json.Wire));
+    app.MapGet("/health", () => Results.Json(new { ok = true, jev = dispatcher.Judge.Enabled }));
+    app.MapGet("/stats", () => Results.Json(dispatcher.Ledger.GetStats(), Json.Wire));
 
     foreach (var path in new[] { "/v1/models", "/models" })
         app.MapGet(path, () =>
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var data = new List<object> { new { id = "frugal/auto", @object = "model", created = now, owned_by = "frugal" } };
-            data.AddRange(frugal.Available().Select(m => new { id = m.Id, @object = "model", created = now, owned_by = m.Provider }));
+            var data = new List<object> { new { id = "the-llm-dispatcher/auto", @object = "model", created = now, owned_by = "dispatcher" } };
+            data.AddRange(dispatcher.Available().Select(m => new { id = m.Id, @object = "model", created = now, owned_by = m.Provider }));
             return Results.Json(new { @object = "list", data });
         });
 
@@ -92,7 +92,7 @@ void Serve(string[] a)
         app.MapPost(path, async (HttpContext ctx) =>
         {
             var req = await ReadRequest(ctx) ?? throw new InvalidOperationException("invalid JSON body");
-            var d = await frugal.RouteAsync(req, ctx.RequestAborted);
+            var d = await dispatcher.RouteAsync(req, ctx.RequestAborted);
             var o = d.Summary();
             o["candidates"] = JsonSerializer.SerializeToNode(d.Candidates, Json.Wire);
             o["estimate"] = JsonSerializer.SerializeToNode(d.Estimate, Json.Wire);
@@ -110,18 +110,18 @@ void Serve(string[] a)
                 return;
             }
             if (string.IsNullOrEmpty(req.Model)) req.Model = "auto";
-            var decision = await frugal.RouteAsync(req, ctx.RequestAborted);
+            var decision = await dispatcher.RouteAsync(req, ctx.RequestAborted);
             var summary = decision.Summary(includeRationale: false);
-            ctx.Response.Headers["x-frugal-model"] = decision.Model.Id;
-            if (decision.Effort is not null) ctx.Response.Headers["x-frugal-effort"] = decision.Effort;
-            ctx.Response.Headers["x-frugal-decision"] = summary.ToJsonString();
+            ctx.Response.Headers["x-dispatcher-model"] = decision.Model.Id;
+            if (decision.Effort is not null) ctx.Response.Headers["x-dispatcher-effort"] = decision.Effort;
+            ctx.Response.Headers["x-dispatcher-decision"] = summary.ToJsonString();
 
             if (req.Stream == true)
             {
                 ctx.Response.StatusCode = 200;
                 ctx.Response.ContentType = "text/event-stream";
                 ctx.Response.Headers.CacheControl = "no-cache";
-                await foreach (var chunk in frugal.StreamAsync(req, decision, ctx.RequestAborted))
+                await foreach (var chunk in dispatcher.StreamAsync(req, decision, ctx.RequestAborted))
                 {
                     await ctx.Response.WriteAsync($"data: {chunk.ToJsonString()}\n\n", ctx.RequestAborted);
                     await ctx.Response.Body.FlushAsync(ctx.RequestAborted);
@@ -129,19 +129,19 @@ void Serve(string[] a)
                 await ctx.Response.WriteAsync("data: [DONE]\n\n", ctx.RequestAborted);
                 return;
             }
-            var (_, response) = await frugal.CompleteAsync(req, decision, ctx.RequestAborted);
+            var (_, response) = await dispatcher.CompleteAsync(req, decision, ctx.RequestAborted);
             ctx.Response.ContentType = "application/json";
             await ctx.Response.WriteAsync(response.ToJsonString(), ctx.RequestAborted);
         });
 
     app.Lifetime.ApplicationStarted.Register(() =>
     {
-        var avail = frugal.Available();
-        Console.WriteLine($"frugal listening on http://localhost:{portArg}");
-        Console.WriteLine($"  jev routing : {(frugal.Judge.Enabled ? "enabled" : "DISABLED (no TYPESAFE_API_KEY; conservative fallback)")}");
+        var avail = dispatcher.Available();
+        Console.WriteLine($"the-llm-dispatcher listening on http://localhost:{portArg}");
+        Console.WriteLine($"  jev routing : {(dispatcher.Judge.Enabled ? "enabled" : "DISABLED (no TYPESAFE_API_KEY; conservative fallback)")}");
         Console.WriteLine($"  providers   : {string.Join(", ", new[] { "anthropic", "openai", "openrouter" }.Where(p => avail.Any(m => m.Provider == p))) switch { "" => "none", var s => s }}");
-        Console.WriteLine($"  models      : {avail.Count} available of {frugal.CatalogModels.Count} in catalog");
-        Console.WriteLine($"  auth        : {(Env.Has(Env.ApiKey) ? "FRUGAL_API_KEY required" : "open (set FRUGAL_API_KEY to protect)")}");
+        Console.WriteLine($"  models      : {avail.Count} available of {dispatcher.CatalogModels.Count} in catalog");
+        Console.WriteLine($"  auth        : {(Env.Has(Env.ApiKey) ? "DISPATCHER_API_KEY required" : "open (set DISPATCHER_API_KEY to protect)")}");
     });
     app.Run();
 }
@@ -150,11 +150,11 @@ async Task RouteAsync(string[] a)
 {
     var text = string.Join(" ", a.Where(x => !x.StartsWith("--")));
     if (text.Length == 0) { Usage("route needs a prompt"); return; }
-    var f = new FrugalRouter(new FrugalConfig { LedgerPath = null });
+    var f = new Dispatcher(new DispatcherConfig { LedgerPath = null });
     if (f.Available().Count == 0)
     {
         Console.Error.WriteLine("(no provider keys configured; dry run against the full catalog)");
-        f = new FrugalRouter(new FrugalConfig { LedgerPath = null, AssumeAllProviders = true });
+        f = new Dispatcher(new DispatcherConfig { LedgerPath = null, AssumeAllProviders = true });
     }
     var d = await f.RouteAsync(new ChatRequest { Model = "auto", Messages = [new ChatMessage { Role = "user", Content = JsonSerializer.SerializeToElement(text) }] });
     var s = d.Summary();
@@ -179,7 +179,7 @@ async Task RouteAsync(string[] a)
 
 void Models()
 {
-    var f = new FrugalRouter(new FrugalConfig { LedgerPath = null });
+    var f = new Dispatcher(new DispatcherConfig { LedgerPath = null });
     var avail = f.Available().Select(m => m.Id).ToHashSet();
     foreach (var m in f.CatalogModels)
         Console.WriteLine($"{(avail.Contains(m.Id) ? "✔" : "·")} {m.Id,-34} tier {m.Tier}  ${m.Price.Input}/${m.Price.Output} per M  {(m.Effort.Count > 0 ? $"effort {string.Join(",", m.Effort)}" : "no effort")}");
@@ -190,12 +190,12 @@ void Usage(string? msg)
 {
     if (msg is not null) Console.Error.WriteLine($"error: {msg}\n");
     Console.WriteLine("""
-        frugal — Jev decides which model and how much effort each LLM request deserves
+        the-llm-dispatcher — an LLM router: Jev (TypeSafe System One) decides which model and how much reasoning effort each request deserves
 
-          frugal serve [--port 8787]        start the OpenAI-compatible proxy
-          frugal route "<prompt>" [--json]  dry run: show the decision for a prompt
-          frugal models                     list the catalog and which providers have keys
-          frugal stats                      cost ledger totals
+          llm-dispatcher serve [--port 8787]        start the OpenAI-compatible proxy
+          llm-dispatcher route "<prompt>" [--json]  dry run: show the decision for a prompt
+          llm-dispatcher models                     list the catalog and which providers have keys
+          llm-dispatcher stats                      cost ledger totals
 
         Keys are read from .env (TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY).
         """);

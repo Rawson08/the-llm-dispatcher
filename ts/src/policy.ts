@@ -6,7 +6,7 @@ import { EFFORT_LADDER } from "./types.js";
  * No I/O, so it is cheap to test and cheap to re-run with new weights.
  */
 export interface PolicyOptions {
-  /** Model the client would have used without frugal; defaults to the priciest frontier model. */
+  /** Model the client would have used without dispatcher; defaults to the priciest frontier model. */
   baselineId?: string;
   /** Weights for the capability-need score. */
   weights?: { difficulty: number; reasoning: number; stakes: number };
@@ -89,7 +89,7 @@ export function decide(
     rationale.push(`no eligible model at tier ${tier}; using best available (tier ${best})`);
   }
   if (pool.length === 0) {
-    throw new Error("frugal: no model satisfies the request (check provider keys, vision/tool support, context size)");
+    throw new Error("dispatcher: no model satisfies the request (check provider keys, vision/tool support, context size)");
   }
 
   pool.sort((a, b) => a.estimatedCost - b.estimatedCost);

@@ -1,4 +1,4 @@
-/** Shared types for frugal. Policy and catalog are plain data so they stay editable. */
+/** Shared types for dispatcher. Policy and catalog are plain data so they stay editable. */
 
 export type ProviderName = "anthropic" | "openai" | "openrouter";
 
@@ -101,7 +101,7 @@ export interface ChatResponse {
     finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
   }>;
   usage: ChatUsage;
-  frugal?: DecisionSummary;
+  dispatcher?: DecisionSummary;
 }
 
 /* ---------- Routing ---------- */

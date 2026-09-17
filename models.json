@@ -1,5 +1,5 @@
 {
-  "$comment": "Prices are USD per 1M tokens, checked 2026-09-17 against Anthropic's price list and OpenRouter's public models API. Tier is a quality belief you should tune: 1 economy, 2 standard, 3 frontier. 'strengths' lifts a model one tier for those tasks, 'weaknesses' lowers it. Edit freely; frugal validates on load.",
+  "$comment": "Prices are USD per 1M tokens, checked 2026-09-17 against Anthropic's price list and OpenRouter's public models API. Tier is a quality belief you should tune: 1 economy, 2 standard, 3 frontier. 'strengths' lifts a model one tier for those tasks, 'weaknesses' lowers it. Edit freely; dispatcher validates on load.",
   "models": [
     { "id": "anthropic/claude-fable-5-1", "provider": "anthropic", "model": "claude-fable-5-1", "name": "Claude Fable 5.1", "tier": 3,
       "price": { "input": 10, "output": 50 }, "context": 1000000, "maxOutput": 128000, "vision": true, "tools": true,

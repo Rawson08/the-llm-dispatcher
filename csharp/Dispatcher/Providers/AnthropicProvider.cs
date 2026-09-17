@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 using Anthropic;
 using Anthropic.Models.Messages;
 
-namespace Frugal.Providers;
+namespace LlmDispatcher.Providers;
 
 /// <summary>Bridges the OpenAI chat dialect onto the Anthropic Messages API via the official SDK.</summary>
 public sealed partial class AnthropicProvider : IProvider

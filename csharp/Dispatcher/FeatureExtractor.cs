@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace Frugal;
+namespace LlmDispatcher;
 
 /// <summary>Code-side facts about the request. No model involved.</summary>
 public static class FeatureExtractor

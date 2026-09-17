@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Anthropic.Models.Messages;
-using Frugal;
-using Frugal.Providers;
+using LlmDispatcher;
+using LlmDispatcher.Providers;
 
-namespace Frugal.Tests;
+namespace Dispatcher.Tests;
 
 public class FeaturesAndConversionTests
 {
@@ -122,8 +122,8 @@ public class FeaturesAndConversionTests
     [Fact]
     public void EnvParserIgnoresCommentsQuotesAndExistingValues()
     {
-        var key = $"FRUGAL_TEST_{Guid.NewGuid():N}";
-        var existing = $"FRUGAL_TEST_EXISTING_{Guid.NewGuid():N}";
+        var key = $"DISPATCHER_TEST_{Guid.NewGuid():N}";
+        var existing = $"DISPATCHER_TEST_EXISTING_{Guid.NewGuid():N}";
         Environment.SetEnvironmentVariable(existing, "keep");
         Env.Apply([$"# comment", $"{key}=\"quoted value\" ", $"{existing}=override", "export IGNORED_FORMAT"]);
         Assert.Equal("quoted value", Environment.GetEnvironmentVariable(key));

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { ENV, has } from "./env.js";
 import { UpstreamError } from "./providers/types.js";
-import { Frugal } from "./router.js";
+import { Dispatcher } from "./router.js";
 import type { ChatRequest } from "./types.js";
 import { summarize } from "./types.js";
 
@@ -11,11 +11,11 @@ const MAX_BODY = 32 * 1024 * 1024;
  * OpenAI-compatible HTTP proxy.
  *   POST /v1/chat/completions   model:"auto" -> Jev routes; concrete model -> passthrough
  *   POST /v1/route              decision only, no upstream call
- *   GET  /v1/models             "frugal/auto" plus every model with credentials
+ *   GET  /v1/models             "the-llm-dispatcher/auto" plus every model with credentials
  *   GET  /stats                 ledger aggregates
  *   GET  /health
  */
-export function createFrugalServer(frugal: Frugal) {
+export function createDispatcherServer(dispatcher: Dispatcher) {
   return createServer(async (req, res) => {
     cors(res);
     if (req.method === "OPTIONS") return end(res, 204);
@@ -23,39 +23,39 @@ export function createFrugalServer(frugal: Frugal) {
     try {
       if (!authorized(req)) return json(res, 401, { error: { message: "unauthorized", type: "auth" } });
 
-      if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true, jev: frugal.judge.enabled });
-      if (req.method === "GET" && url.pathname === "/stats") return json(res, 200, frugal.ledger.stats());
+      if (req.method === "GET" && url.pathname === "/health") return json(res, 200, { ok: true, jev: dispatcher.judge.enabled });
+      if (req.method === "GET" && url.pathname === "/stats") return json(res, 200, dispatcher.ledger.stats());
       if (req.method === "GET" && (url.pathname === "/v1/models" || url.pathname === "/models")) {
         const now = Math.floor(Date.now() / 1000);
         const data = [
-          { id: "frugal/auto", object: "model", created: now, owned_by: "frugal" },
-          ...frugal.available().map((m) => ({ id: m.id, object: "model", created: now, owned_by: m.provider })),
+          { id: "the-llm-dispatcher/auto", object: "model", created: now, owned_by: "dispatcher" },
+          ...dispatcher.available().map((m) => ({ id: m.id, object: "model", created: now, owned_by: m.provider })),
         ];
         return json(res, 200, { object: "list", data });
       }
       if (req.method === "POST" && (url.pathname === "/v1/route" || url.pathname === "/route")) {
         const body = (await readJson(req)) as ChatRequest;
         if (!body.model) body.model = "auto";
-        const d = await frugal.route(body);
+        const d = await dispatcher.route(body);
         return json(res, 200, { ...summarize(d), candidates: d.candidates, estimate: d.estimate });
       }
       if (req.method === "POST" && (url.pathname === "/v1/chat/completions" || url.pathname === "/chat/completions")) {
         const body = (await readJson(req)) as ChatRequest;
         if (!Array.isArray(body.messages)) return json(res, 400, { error: { message: "messages[] required", type: "invalid_request_error" } });
         body.model ||= "auto";
-        const decision = await frugal.route(body);
+        const decision = await dispatcher.route(body);
         const summary = summarize(decision);
-        res.setHeader("x-frugal-model", summary.model);
-        if (summary.effort) res.setHeader("x-frugal-effort", summary.effort);
-        res.setHeader("x-frugal-decision", JSON.stringify({ ...summary, rationale: undefined }));
+        res.setHeader("x-dispatcher-model", summary.model);
+        if (summary.effort) res.setHeader("x-dispatcher-effort", summary.effort);
+        res.setHeader("x-dispatcher-decision", JSON.stringify({ ...summary, rationale: undefined }));
 
         if (body.stream) {
           res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
-          for await (const chunk of frugal.stream(body, decision)) res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+          for await (const chunk of dispatcher.stream(body, decision)) res.write(`data: ${JSON.stringify(chunk)}\n\n`);
           res.write("data: [DONE]\n\n");
           return res.end();
         }
-        const { response } = await frugal.complete(body, decision);
+        const { response } = await dispatcher.complete(body, decision);
         return json(res, 200, response);
       }
       return json(res, 404, { error: { message: `no route for ${req.method} ${url.pathname}`, type: "not_found" } });
@@ -70,15 +70,15 @@ export function createFrugalServer(frugal: Frugal) {
   });
 }
 
-export function startServer(frugal: Frugal, port = Number(process.env[ENV.port] ?? 8787)) {
-  const server = createFrugalServer(frugal);
+export function startServer(dispatcher: Dispatcher, port = Number(process.env[ENV.port] ?? 8787)) {
+  const server = createDispatcherServer(dispatcher);
   server.listen(port, () => {
-    const avail = frugal.available();
-    console.log(`frugal listening on http://localhost:${port}`);
-    console.log(`  jev routing : ${frugal.judge.enabled ? "enabled" : "DISABLED (no TYPESAFE_API_KEY; conservative fallback)"}`);
+    const avail = dispatcher.available();
+    console.log(`the-llm-dispatcher listening on http://localhost:${port}`);
+    console.log(`  jev routing : ${dispatcher.judge.enabled ? "enabled" : "DISABLED (no TYPESAFE_API_KEY; conservative fallback)"}`);
     console.log(`  providers   : ${(["anthropic", "openai", "openrouter"] as const).filter((p) => avail.some((m) => m.provider === p)).join(", ") || "none"}`);
-    console.log(`  models      : ${avail.length} available of ${frugal.catalog.length} in catalog`);
-    console.log(`  auth        : ${has(ENV.apiKey) ? "FRUGAL_API_KEY required" : "open (set FRUGAL_API_KEY to protect)"}`);
+    console.log(`  models      : ${avail.length} available of ${dispatcher.catalog.length} in catalog`);
+    console.log(`  auth        : ${has(ENV.apiKey) ? "DISPATCHER_API_KEY required" : "open (set DISPATCHER_API_KEY to protect)"}`);
   });
   return server;
 }

@@ -1,6 +1,6 @@
-using Frugal;
+using LlmDispatcher;
 
-namespace Frugal.Tests;
+namespace Dispatcher.Tests;
 
 public class PolicyTests
 {

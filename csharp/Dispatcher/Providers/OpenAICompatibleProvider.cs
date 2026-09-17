@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Frugal.Providers;
+namespace LlmDispatcher.Providers;
 
 /// <summary>
 /// Any provider that speaks the OpenAI chat-completions dialect: OpenAI itself, OpenRouter,
@@ -35,12 +35,12 @@ public sealed class OpenAICompatibleProvider : IProvider
 
     public static OpenAICompatibleProvider OpenRouter() => new(
         "openrouter", "https://openrouter.ai/api/v1", Env.OpenRouter,
-        new Dictionary<string, string> { ["HTTP-Referer"] = "https://github.com/frugal-router", ["X-Title"] = "frugal" });
+        new Dictionary<string, string> { ["HTTP-Referer"] = "https://github.com/the-llm-dispatcher", ["X-Title"] = "dispatcher" });
 
     private JsonObject Body(ChatRequest req, ModelSpec spec, string? effort, bool stream)
     {
         var body = JsonSerializer.SerializeToNode(req, Json.Wire)!.AsObject();
-        body.Remove("frugal_options");
+        body.Remove("dispatcher_options");
         body["model"] = spec.Model;
         body["stream"] = stream;
         if (effort is not null && spec.Effort.Count > 0) body["reasoning_effort"] = effort;

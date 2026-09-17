@@ -5,12 +5,12 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Frugal;
+namespace LlmDispatcher;
 
 /// <summary>
 /// Asks Jev (TypeSafe's System One model) five independent questions about the request in one
 /// HTTP call. There is no official C# TypeSafe SDK, so this speaks the documented HTTP API directly.
-/// Jev sees the conversation text; frugal's code owns the policy.
+/// Jev sees the conversation text; dispatcher's code owns the policy.
 /// </summary>
 public sealed class Judge
 {

@@ -1,8 +1,10 @@
-# frugal
+# the-llm-dispatcher
 
-**Jev decides which model, and how hard it should think, before every LLM call.**
+**An LLM router that sits in front of every model call. It uses [Jev](https://typesafe.ai), TypeSafe's
+System One decision model, to judge each request and dispatch it to the cheapest model and the lowest
+reasoning effort that will do the job, so you stop paying frontier prices for routine work.**
 
-frugal is a drop-in, OpenAI-compatible proxy. Point any client at it with `model: "auto"` and,
+the-llm-dispatcher is a drop-in, OpenAI-compatible proxy. Point any client at it with `model: "auto"` and,
 for each request, it asks [Jev](https://typesafe.ai) (TypeSafe's System One model) five typed
 questions about the conversation, then picks the cheapest model in your catalog that can do the
 job and the lowest reasoning effort that job deserves. A greeting goes to a $0.07/M model at
@@ -31,7 +33,7 @@ code you can read, test, and tune.
 
 1. **Code extracts facts**: token estimate, whether images or tools are present, requested
    `max_tokens`, the last user message, the system prompt, and recent turns.
-2. **Jev answers five questions in one call** (see `ts/src/judge.ts` / `csharp/Frugal/Judge.cs`):
+2. **Jev answers five questions in one call** (see `ts/src/judge.ts` / `csharp/Dispatcher/Judge.cs`):
    - `task` (choice): coding, writing, conversation, analysis, math, extraction, summarization, creative, agentic, other
    - `difficulty` (score 0 to 4): trivial, routine, moderate, hard, frontier
    - `reasoning` (score 0 to 3): none, light, substantial, deep
@@ -51,7 +53,7 @@ code you can read, test, and tune.
    `reasoning_effort` for OpenAI-compatible APIs. Anthropic requests are translated to and from
    the Messages API, including tools, tool results, images, and streaming.
 
-Every response includes a `frugal` object and `x-frugal-*` headers with the decision, the
+Every response includes a `the-llm-dispatcher` object and `x-dispatcher-*` headers with the decision, the
 rationale, and estimated cost versus a baseline model. Nothing about your prompts is stored;
 the ledger keeps tokens, models, and dollars only.
 
@@ -78,8 +80,8 @@ npm run serve                                                   # proxy on http:
 
 ```bash
 cd csharp
-dotnet run --project Frugal -- route "Write a limerick about tabs versus spaces"
-dotnet run --project Frugal -- serve
+dotnet run --project Dispatcher -- route "Write a limerick about tabs versus spaces"
+dotnet run --project Dispatcher -- serve
 ```
 
 ### Use it from any OpenAI client
@@ -92,29 +94,29 @@ curl http://localhost:8787/v1/chat/completions \
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8787/v1", api_key="unused-unless-FRUGAL_API_KEY-is-set")
+client = OpenAI(base_url="http://localhost:8787/v1", api_key="unused-unless-DISPATCHER_API_KEY-is-set")
 r = client.chat.completions.create(model="auto", messages=[{"role": "user", "content": "hi"}])
-print(r.model, r.model_extra["frugal"])
+print(r.model, r.model_extra["the-llm-dispatcher"])
 ```
 
 Streaming works (`"stream": true`). Requests that name a concrete catalog model such as
 `anthropic/claude-sonnet-5` are forwarded unchanged and marked `passthrough`, unless
-`FRUGAL_ROUTE_ALL=1`.
+`DISPATCHER_ROUTE_ALL=1`.
 
 ## Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/v1/chat/completions` | OpenAI-compatible completion; `model: "auto"` routes |
-| POST | `/v1/route` | Decision only, no upstream call. Cheap way to see what frugal would do |
-| GET | `/v1/models` | `frugal/auto` plus every model with credentials |
+| POST | `/v1/route` | Decision only, no upstream call. Cheap way to see what the-llm-dispatcher would do |
+| GET | `/v1/models` | `the-llm-dispatcher/auto` plus every model with credentials |
 | GET | `/stats` | Ledger totals: spend, baseline spend, Jev spend, savings, per model, per task |
 | GET | `/health` | Liveness and whether Jev routing is enabled |
 
-Per-request overrides go in the body under `frugal_options`:
+Per-request overrides go in the body under `dispatcher_options`:
 
 ```json
-{ "model": "auto", "messages": [...], "frugal_options": { "min_tier": 2, "max_tier": 3, "baseline": "openai/gpt-6-astra" } }
+{ "model": "auto", "messages": [...], "dispatcher_options": { "min_tier": 2, "max_tier": 3, "baseline": "openai/gpt-6-astra" } }
 ```
 
 ## The catalog
@@ -125,7 +127,7 @@ takes images and tools, the effort levels it accepts, and a **tier**: your belie
 general quality (1 economy, 2 standard, 3 frontier). `strengths` lifts a model one tier for the
 listed tasks; `weaknesses` lowers it. Prices were checked on 2026-09-17 against Anthropic's price
 list and OpenRouter's public models API. Edit the file freely; both implementations validate it on
-load. Point `FRUGAL_CATALOG` at your own file to keep a private catalog.
+load. Point `DISPATCHER_CATALOG` at your own file to keep a private catalog.
 
 Tiers are the part you should tune. They encode a quality opinion, not a measurement. Run your own
 traffic through `/v1/route` for a day, look at the ledger, and move models between tiers until
@@ -135,25 +137,25 @@ the decisions match what your team would choose by hand.
 
 All configuration is environment variables, loaded from `.env` in the working directory or any
 parent up to three levels (so both `ts/` and `csharp/` find the repo-root file). See
-`.env.example` for the full list. frugal reports whether a key is present and never its value.
+`.env.example` for the full list. the-llm-dispatcher reports whether a key is present and never its value.
 
 ## Library use
 
 TypeScript:
 
 ```ts
-import { Frugal } from "frugal-router";
-const frugal = new Frugal();
-const decision = await frugal.route({ model: "auto", messages });   // no upstream call
-const { response } = await frugal.complete(request);                 // route + call + ledger
+import { Dispatcher } from "the-llm-dispatcher";
+const the-llm-dispatcher = new Dispatcher();
+const decision = await the-llm-dispatcher.route({ model: "auto", messages });   // no upstream call
+const { response } = await the-llm-dispatcher.complete(request);                 // route + call + ledger
 ```
 
 C#:
 
 ```csharp
-var frugal = new FrugalRouter();
-var decision = await frugal.RouteAsync(request);
-var (_, response) = await frugal.CompleteAsync(request);
+var the-llm-dispatcher = new Dispatcher();
+var decision = await the-llm-dispatcher.RouteAsync(request);
+var (_, response) = await the-llm-dispatcher.CompleteAsync(request);
 ```
 
 ## Prior art
@@ -167,21 +169,21 @@ you better, use it:
 - [BunsDev/typesafe-router](https://github.com/BunsDev/typesafe-router): TypeScript library that picks among abstract option ids
 - [tylerjharden/ailerix](https://github.com/tylerjharden/ailerix): hosted OpenRouter-style product on an Artificial Analysis Pareto frontier
 
-frugal differs in combining all of: a general OpenAI-compatible proxy, native Anthropic and
+the-llm-dispatcher differs in combining all of: a general OpenAI-compatible proxy, native Anthropic and
 OpenAI-compatible transports with no gateway dependency, model **and** effort selection with the
 effort actually applied per provider, a transparent code-owned policy with confidence gating, a
 cost ledger, and two first-class language implementations.
 
 ## Caveats
 
-- Jev's judgments are calibrated but not infallible. Keep `FRUGAL_BASELINE` honest and watch
+- Jev's judgments are calibrated but not infallible. Keep `DISPATCHER_BASELINE` honest and watch
   `/stats`. If quality drops for a task type, raise the tier thresholds or add `strengths`.
 - Prompt caching is model-scoped. Routing a long conversation across several models forfeits cache
   reuse. For agentic sessions, prefer pinning a model per session (send it explicitly) and letting
-  frugal choose only the effort, or route only the first turn.
+  the-llm-dispatcher choose only the effort, or route only the first turn.
 - Anthropic's `xhigh` and `max` effort levels, forced tool choice, and sampling parameters are
   model-dependent; the catalog and the provider bridge encode what is known as of September 2026.
-- The proxy holds your provider keys. Set `FRUGAL_API_KEY` before exposing it beyond localhost.
+- The proxy holds your provider keys. Set `DISPATCHER_API_KEY` before exposing it beyond localhost.
 
 ## License
 

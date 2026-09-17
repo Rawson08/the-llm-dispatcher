@@ -16,7 +16,7 @@ export interface ChatChunk {
     finish_reason: "stop" | "length" | "tool_calls" | "content_filter" | null;
   }>;
   usage?: ChatUsage | null;
-  frugal?: DecisionSummary;
+  dispatcher?: DecisionSummary;
 }
 
 export interface Provider {
@@ -37,4 +37,4 @@ export class UpstreamError extends Error {
 }
 
 /** Keys the proxy owns and must not forward. */
-export const FRUGAL_ONLY_FIELDS = ["frugal", "frugal_options"];
+export const DISPATCHER_ONLY_FIELDS = ["dispatcher", "dispatcher_options"];

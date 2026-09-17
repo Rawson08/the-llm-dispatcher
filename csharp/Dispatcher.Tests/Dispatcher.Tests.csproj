@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Frugal\Frugal.csproj" />
+    <ProjectReference Include="..\Dispatcher\Dispatcher.csproj" />
   </ItemGroup>
 
 </Project>

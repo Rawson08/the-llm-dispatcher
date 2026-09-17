@@ -4,7 +4,7 @@ import { ENV, has } from "./env.js";
 
 /**
  * Asks Jev five independent questions about the request in one call.
- * Jev sees the conversation text; frugal's code owns the policy.
+ * Jev sees the conversation text; dispatcher's code owns the policy.
  */
 export class Judge {
   private client: TypeSafeClient | null;
