@@ -1,6 +1,23 @@
 /** Shared types for dispatcher. Policy and catalog are plain data so they stay editable. */
 
-export type ProviderName = "anthropic" | "openai" | "openrouter";
+/**
+ * "anthropic", "openai" and "openrouter" are built in. Any other name must be declared in the
+ * catalog's `providers` section as an OpenAI-compatible endpoint (Ollama, LM Studio, vLLM, ...).
+ */
+export type ProviderName = string;
+
+/** An OpenAI-compatible endpoint declared in the catalog. */
+export interface ProviderConfig {
+  baseUrl: string;
+  /** Env var holding the bearer key; null or absent means the endpoint needs no key. */
+  apiKeyEnv?: string | null;
+  /** Set false to keep a keyless provider (a local server) out of routing until you opt in. */
+  enabled?: boolean;
+  /** Extra headers to send with every request. */
+  headers?: Record<string, string>;
+  /** OpenAI's newer models reject `max_tokens`; set true to rename it. */
+  useMaxCompletionTokens?: boolean;
+}
 
 /** Canonical effort ladder, lowest to highest. Providers support subsets. */
 export const EFFORT_LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;

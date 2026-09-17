@@ -5,6 +5,9 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
+/** Variables that loadEnv() itself added to process.env, so wrappers can keep them from child CLIs. */
+export const loadedFromEnvFile: string[] = [];
+
 /** Looks in the working directory, then up to three parents (the repo root when run from ts/). */
 export function loadEnv(file = process.env.DISPATCHER_ENV_FILE ?? ".env"): boolean {
   let dir = process.cwd();
@@ -12,8 +15,10 @@ export function loadEnv(file = process.env.DISPATCHER_ENV_FILE ?? ".env"): boole
     const path = resolve(dir, file);
     if (existsSync(path)) {
       try {
+        const before = new Set(Object.keys(process.env));
         // Node 20.12+ / 22: parses the file and only sets variables not already defined.
         process.loadEnvFile(path);
+        for (const k of Object.keys(process.env)) if (!before.has(k)) loadedFromEnvFile.push(k);
         return true;
       } catch {
         return false;

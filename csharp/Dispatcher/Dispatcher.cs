@@ -8,6 +8,8 @@ namespace LlmDispatcher;
 public sealed class DispatcherConfig
 {
     public List<ModelSpec>? Catalog { get; set; }
+    /// <summary>Provider endpoints; defaults to the built-ins plus whatever the catalog file declares.</summary>
+    public Dictionary<string, ProviderConfig>? ProviderConfigs { get; set; }
     public Judge? Judge { get; set; }
     /// <summary>Null disables the ledger file; unset uses DISPATCHER_LEDGER_PATH or dispatcher-ledger.jsonl.</summary>
     public string? LedgerPath { get; set; } = "";
@@ -29,6 +31,7 @@ public sealed class DispatcherConfig
 public sealed class Dispatcher
 {
     public IReadOnlyList<ModelSpec> CatalogModels { get; }
+    public Dictionary<string, ProviderConfig> ProviderConfigs { get; }
     public Judge Judge { get; }
     public Ledger Ledger { get; }
     private readonly DispatcherConfig _cfg;
@@ -38,7 +41,9 @@ public sealed class Dispatcher
     public Dispatcher(DispatcherConfig? cfg = null)
     {
         _cfg = cfg ?? new DispatcherConfig();
-        CatalogModels = _cfg.Catalog ?? Catalog.Load();
+        var file = _cfg.Catalog is null || _cfg.ProviderConfigs is null ? Catalog.LoadFile() : null;
+        CatalogModels = _cfg.Catalog ?? file!.Models;
+        ProviderConfigs = _cfg.ProviderConfigs ?? file!.Providers;
         Judge = _cfg.Judge ?? new Judge();
         var ledgerPath = _cfg.LedgerPath == "" ? Env.Get(Env.LedgerPath) ?? "dispatcher-ledger.jsonl" : _cfg.LedgerPath;
         Ledger = new Ledger(ledgerPath);
@@ -49,9 +54,14 @@ public sealed class Dispatcher
             ["openai"] = _cfg.Providers?.GetValueOrDefault("openai") ?? OpenAICompatibleProvider.OpenAI(),
             ["openrouter"] = _cfg.Providers?.GetValueOrDefault("openrouter") ?? OpenAICompatibleProvider.OpenRouter(),
         };
+        foreach (var (name, pc) in ProviderConfigs)
+            if (!_providers.ContainsKey(name)) _providers[name] = _cfg.Providers?.GetValueOrDefault(name) ?? OpenAICompatibleProvider.Custom(name, pc);
     }
 
-    public List<ModelSpec> Available() => _cfg.AssumeAllProviders ? CatalogModels.ToList() : Catalog.Available(CatalogModels);
+    public List<ModelSpec> Available() => _cfg.AssumeAllProviders ? CatalogModels.ToList() : Catalog.Available(CatalogModels, ProviderConfigs);
+
+    private IProvider ProviderFor(ModelSpec spec) =>
+        _providers.TryGetValue(spec.Provider, out var p) ? p : throw new InvalidOperationException($"dispatcher: model {spec.Id} names provider \"{spec.Provider}\" which is not configured");
 
     public bool ShouldRoute(string? model) =>
         (_cfg.RouteAll ?? Env.Get(Env.RouteAll) == "1") || _aliases.Contains((model ?? "").ToLowerInvariant());
@@ -62,7 +72,7 @@ public sealed class Dispatcher
         var features = FeatureExtractor.Extract(req);
         var available = Available();
         if (available.Count == 0)
-            throw new InvalidOperationException("dispatcher: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
+            throw new InvalidOperationException("dispatcher: no usable provider (set ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY, or enable a provider in models.json)");
         var ropts = req.DispatcherOptions ?? new RequestOptions();
 
         if (!ShouldRoute(req.Model))
@@ -114,7 +124,7 @@ public sealed class Dispatcher
     public async Task<(Decision Decision, JsonObject Response)> CompleteAsync(ChatRequest req, Decision? decision = null, CancellationToken ct = default)
     {
         var d = decision ?? await RouteAsync(req, ct);
-        var provider = _providers[d.Model.Provider];
+        var provider = ProviderFor(d.Model);
         var sw = Stopwatch.StartNew();
         try
         {
@@ -142,7 +152,7 @@ public sealed class Dispatcher
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var d = decision ?? await RouteAsync(req, ct);
-        var provider = _providers[d.Model.Provider];
+        var provider = ProviderFor(d.Model);
         var sw = Stopwatch.StartNew();
         JsonObject? usage = null;
         var first = true;

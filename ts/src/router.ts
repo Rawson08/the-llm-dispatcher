@@ -1,17 +1,19 @@
-import { availableModels, findModel, loadCatalog } from "./catalog.js";
+import { availableModels, findModel, loadCatalogFile } from "./catalog.js";
 import { ENV } from "./env.js";
 import { extractFeatures } from "./features.js";
 import { Judge, fallback } from "./judge.js";
 import { Ledger } from "./ledger.js";
 import { decide, estimateCost, expectedOutputTokens, snapEffort, type PolicyOptions } from "./policy.js";
 import { AnthropicProvider } from "./providers/anthropic.js";
-import { openaiProvider, openrouterProvider } from "./providers/openai-compatible.js";
+import { customProvider, openaiProvider, openrouterProvider } from "./providers/openai-compatible.js";
 import type { ChatChunk, Provider } from "./providers/types.js";
-import type { ChatRequest, ChatResponse, Decision, Effort, ModelSpec, ProviderName, Tier } from "./types.js";
+import type { ChatRequest, ChatResponse, Decision, Effort, ModelSpec, ProviderConfig, ProviderName, Tier } from "./types.js";
 import { EFFORT_LADDER, summarize } from "./types.js";
 
 export interface DispatcherConfig {
   catalog?: ModelSpec[];
+  /** Provider endpoints; defaults to the built-ins plus whatever the catalog file declares. */
+  providerConfigs?: Record<string, ProviderConfig>;
   judge?: Judge;
   ledgerPath?: string | null;
   /** Model id that represents "what you would have used anyway". */
@@ -37,6 +39,7 @@ export interface RequestOptions {
 
 export class Dispatcher {
   readonly catalog: ModelSpec[];
+  readonly providerConfigs: Record<string, ProviderConfig>;
   readonly judge: Judge;
   readonly ledger: Ledger;
   readonly aliases: Set<string>;
@@ -45,7 +48,9 @@ export class Dispatcher {
 
   constructor(cfg: DispatcherConfig = {}) {
     this.cfg = cfg;
-    this.catalog = cfg.catalog ?? loadCatalog();
+    const file = cfg.catalog && cfg.providerConfigs ? undefined : loadCatalogFile();
+    this.catalog = cfg.catalog ?? file!.models;
+    this.providerConfigs = cfg.providerConfigs ?? file!.providers;
     this.judge = cfg.judge ?? new Judge();
     const ledgerPath = cfg.ledgerPath === undefined ? (process.env[ENV.ledger] ?? "dispatcher-ledger.jsonl") : cfg.ledgerPath;
     this.ledger = new Ledger(ledgerPath ?? undefined);
@@ -55,10 +60,13 @@ export class Dispatcher {
       openai: cfg.providers?.openai ?? openaiProvider(),
       openrouter: cfg.providers?.openrouter ?? openrouterProvider(),
     };
+    for (const [name, pc] of Object.entries(this.providerConfigs)) {
+      if (!this.providers[name]) this.providers[name] = cfg.providers?.[name] ?? customProvider(name, pc);
+    }
   }
 
   available(): ModelSpec[] {
-    return this.cfg.assumeAllProviders ? this.catalog : availableModels(this.catalog);
+    return this.cfg.assumeAllProviders ? this.catalog : availableModels(this.catalog, this.providerConfigs);
   }
 
   shouldRoute(model: string): boolean {
@@ -70,7 +78,9 @@ export class Dispatcher {
   async route(req: ChatRequest): Promise<Decision> {
     const features = extractFeatures(req);
     const available = this.available();
-    if (available.length === 0) throw new Error("dispatcher: no provider keys configured (ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY)");
+    if (available.length === 0) {
+      throw new Error("dispatcher: no usable provider (set ANTHROPIC_API_KEY, OPENAI_API_KEY or OPENROUTER_API_KEY, or enable a provider in models.json)");
+    }
     const ropts = (req.dispatcher_options ?? {}) as RequestOptions;
 
     if (!this.shouldRoute(req.model)) {
@@ -100,6 +110,12 @@ export class Dispatcher {
     return decision;
   }
 
+  private provider(spec: ModelSpec): Provider {
+    const p = this.providers[spec.provider];
+    if (!p) throw new Error(`dispatcher: model ${spec.id} names provider "${spec.provider}" which is not configured`);
+    return p;
+  }
+
   private passthrough(spec: ModelSpec, inputTokens: number, req: ChatRequest): Decision {
     const j = fallback("passthrough");
     const effort = req.reasoning_effort && EFFORT_LADDER.includes(req.reasoning_effort as Effort)
@@ -124,7 +140,7 @@ export class Dispatcher {
   /** Route, call the chosen provider, and record the outcome. */
   async complete(req: ChatRequest, decision?: Decision): Promise<{ decision: Decision; response: ChatResponse }> {
     const d = decision ?? (await this.route(req));
-    const provider = this.providers[d.model.provider];
+    const provider = this.provider(d.model);
     const started = Date.now();
     try {
       const response = await provider.complete(req, d.model, d.effort);
@@ -151,7 +167,7 @@ export class Dispatcher {
   /** Route and stream chunks; the first chunk carries the decision, the last carries usage. */
   async *stream(req: ChatRequest, decision?: Decision): AsyncGenerator<ChatChunk, void, undefined> {
     const d = decision ?? (await this.route(req));
-    const provider = this.providers[d.model.provider];
+    const provider = this.provider(d.model);
     const started = Date.now();
     let usage: ChatChunk["usage"] | undefined;
     let first = true;

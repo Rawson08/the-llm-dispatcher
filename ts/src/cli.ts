@@ -54,6 +54,20 @@ async function main() {
       console.log(JSON.stringify(f.ledger.stats(), null, 2));
       return;
     }
+    case "claude": {
+      const { runClaude } = await import("./wrappers/claude.js");
+      process.exitCode = await runClaude(rest);
+      return;
+    }
+    case "codex": {
+      const { runCodex } = await import("./wrappers/codex.js");
+      process.exitCode = await runCodex(rest);
+      return;
+    }
+    case "statusline": {
+      const { statusline } = await import("./wrappers/statusline.js");
+      return statusline();
+    }
     default:
       return usage();
   }
@@ -68,12 +82,18 @@ function usage(msg?: string) {
   if (msg) console.error(`error: ${msg}\n`);
   console.log(`the-llm-dispatcher — an LLM router: Jev (TypeSafe System One) decides which model and how much reasoning effort each request deserves
 
-  llm-dispatcher serve [--port 8787]     start the OpenAI-compatible proxy
-  llm-dispatcher route "<prompt>" [--json]  dry run: show the decision for a prompt
-  llm-dispatcher models                  list the catalog and which providers have keys
-  llm-dispatcher stats                   cost ledger totals
+  API proxy (needs provider API keys):
+    llm-dispatcher serve [--port 8787]        start the OpenAI-compatible proxy
+    llm-dispatcher route "<prompt>" [--json]  dry run: show the decision for a prompt
+    llm-dispatcher models                     list the catalog and which providers are usable
+    llm-dispatcher stats                      cost ledger totals
 
-Keys are read from .env (TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY).`);
+  CLI wrappers (use the CLI's own login, no API key; see README restrictions):
+    llm-dispatcher claude [claude args...]    Claude Code with a Jev-chosen Claude model per turn
+    llm-dispatcher codex  [codex args...]     Codex CLI with a Jev-chosen model per turn
+
+Keys are read from .env (TYPESAFE_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY).
+Local models: declare an OpenAI-compatible endpoint under "providers" in models.json.`);
   if (msg) process.exit(2);
 }
 

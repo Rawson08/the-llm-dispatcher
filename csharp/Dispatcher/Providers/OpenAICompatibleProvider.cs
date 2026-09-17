@@ -8,7 +8,7 @@ namespace LlmDispatcher.Providers;
 
 /// <summary>
 /// Any provider that speaks the OpenAI chat-completions dialect: OpenAI itself, OpenRouter,
-/// Groq, Together, vLLM, and so on.
+/// Groq, Together, vLLM, Ollama, LM Studio, and so on.
 /// </summary>
 public sealed class OpenAICompatibleProvider : IProvider
 {
@@ -16,11 +16,12 @@ public sealed class OpenAICompatibleProvider : IProvider
 
     public string Name { get; }
     private readonly string _baseUrl;
-    private readonly string _apiKeyEnv;
+    /// <summary>Null means the endpoint needs no key (a local server).</summary>
+    private readonly string? _apiKeyEnv;
     private readonly IReadOnlyDictionary<string, string> _extraHeaders;
     private readonly bool _useMaxCompletionTokens;
 
-    public OpenAICompatibleProvider(string name, string baseUrl, string apiKeyEnv,
+    public OpenAICompatibleProvider(string name, string baseUrl, string? apiKeyEnv,
         IReadOnlyDictionary<string, string>? extraHeaders = null, bool useMaxCompletionTokens = false)
     {
         Name = name;
@@ -35,7 +36,11 @@ public sealed class OpenAICompatibleProvider : IProvider
 
     public static OpenAICompatibleProvider OpenRouter() => new(
         "openrouter", "https://openrouter.ai/api/v1", Env.OpenRouter,
-        new Dictionary<string, string> { ["HTTP-Referer"] = "https://github.com/the-llm-dispatcher", ["X-Title"] = "dispatcher" });
+        new Dictionary<string, string> { ["HTTP-Referer"] = "https://github.com/the-llm-dispatcher", ["X-Title"] = "the-llm-dispatcher" });
+
+    /// <summary>A provider declared in the catalog: any OpenAI-compatible server, local or hosted.</summary>
+    public static OpenAICompatibleProvider Custom(string name, ProviderConfig cfg) => new(
+        name, cfg.BaseUrl, string.IsNullOrEmpty(cfg.ApiKeyEnv) ? null : cfg.ApiKeyEnv, cfg.Headers, cfg.UseMaxCompletionTokens ?? false);
 
     private JsonObject Body(ChatRequest req, ModelSpec spec, string? effort, bool stream)
     {
@@ -53,6 +58,7 @@ public sealed class OpenAICompatibleProvider : IProvider
         if (stream)
         {
             var so = body["stream_options"] as JsonObject ?? new JsonObject();
+            if (body["stream_options"] is JsonObject) body.Remove("stream_options");
             so["include_usage"] = true;
             body["stream_options"] = so;
         }
@@ -62,13 +68,16 @@ public sealed class OpenAICompatibleProvider : IProvider
 
     private async Task<HttpResponseMessage> PostAsync(JsonObject body, CancellationToken ct)
     {
-        var key = Env.Get(_apiKeyEnv);
-        if (string.IsNullOrEmpty(key)) throw new UpstreamException(Name, 0, $"{_apiKeyEnv} is not set");
         var req = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chat/completions")
         {
             Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        if (_apiKeyEnv is not null)
+        {
+            var key = Env.Get(_apiKeyEnv);
+            if (string.IsNullOrEmpty(key)) throw new UpstreamException(Name, 0, $"{_apiKeyEnv} is not set");
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key);
+        }
         foreach (var (k, v) in _extraHeaders) req.Headers.TryAddWithoutValidation(k, v);
         var res = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!res.IsSuccessStatusCode)

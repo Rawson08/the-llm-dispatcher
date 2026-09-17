@@ -4,7 +4,8 @@ import { type ChatChunk, DISPATCHER_ONLY_FIELDS, type Provider, UpstreamError } 
 export interface OpenAICompatibleOptions {
   name: string;
   baseURL: string;
-  apiKeyEnv: string;
+  /** Env var with the bearer key; omit for keyless local servers. */
+  apiKeyEnv?: string | null;
   extraHeaders?: Record<string, string>;
   /** OpenAI's newer models reject `max_tokens`; rename it. */
   useMaxCompletionTokens?: boolean;
@@ -22,9 +23,13 @@ export class OpenAICompatibleProvider implements Provider {
   }
 
   private headers(): Record<string, string> {
-    const key = process.env[this.o.apiKeyEnv];
-    if (!key) throw new UpstreamError(this.name, 0, `${this.o.apiKeyEnv} is not set`);
-    return { "content-type": "application/json", authorization: `Bearer ${key}`, ...(this.o.extraHeaders ?? {}) };
+    const h: Record<string, string> = { "content-type": "application/json", ...(this.o.extraHeaders ?? {}) };
+    if (this.o.apiKeyEnv) {
+      const key = process.env[this.o.apiKeyEnv];
+      if (!key) throw new UpstreamError(this.name, 0, `${this.o.apiKeyEnv} is not set`);
+      h.authorization = `Bearer ${key}`;
+    }
+    return h;
   }
 
   private body(req: ChatRequest, spec: ModelSpec, effort: Effort | undefined, stream: boolean): Record<string, unknown> {
@@ -102,5 +107,16 @@ export function openrouterProvider(): OpenAICompatibleProvider {
     baseURL: "https://openrouter.ai/api/v1",
     apiKeyEnv: "OPENROUTER_API_KEY",
     extraHeaders: { "HTTP-Referer": "https://github.com/the-llm-dispatcher", "X-Title": "dispatcher" },
+  });
+}
+
+/** A provider declared in the catalog: any OpenAI-compatible server, local or hosted. */
+export function customProvider(name: string, cfg: import("../types.js").ProviderConfig): OpenAICompatibleProvider {
+  return new OpenAICompatibleProvider({
+    name,
+    baseURL: cfg.baseUrl,
+    apiKeyEnv: cfg.apiKeyEnv ?? null,
+    extraHeaders: cfg.headers,
+    useMaxCompletionTokens: cfg.useMaxCompletionTokens ?? false,
   });
 }

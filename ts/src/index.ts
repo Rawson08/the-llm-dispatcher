@@ -10,3 +10,9 @@ export { AnthropicProvider, toAnthropicParams, fromAnthropicMessage } from "./pr
 export { OpenAICompatibleProvider, openaiProvider, openrouterProvider } from "./providers/openai-compatible.js";
 export { UpstreamError, type Provider, type ChatChunk } from "./providers/types.js";
 export * from "./types.js";
+export { loadCatalogFile, providerAvailable, BUILTIN_PROVIDERS, type CatalogFile } from "./catalog.js";
+export { customProvider } from "./providers/openai-compatible.js";
+export { runClaude } from "./wrappers/claude.js";
+export { runCodex } from "./wrappers/codex.js";
+export { TurnRouter } from "./wrappers/session.js";
+export * as turns from "./wrappers/turns.js";

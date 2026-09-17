@@ -24,6 +24,22 @@ public sealed class Price
     public double Output { get; set; }
 }
 
+/// <summary>
+/// An OpenAI-compatible endpoint declared in the catalog's "providers" section. "anthropic",
+/// "openai" and "openrouter" are built in; anything else (Ollama, LM Studio, vLLM) is declared here.
+/// </summary>
+public sealed class ProviderConfig
+{
+    public string BaseUrl { get; set; } = "";
+    /// <summary>Env var holding the bearer key; null means the endpoint needs no key.</summary>
+    public string? ApiKeyEnv { get; set; }
+    /// <summary>False keeps a keyless provider (a local server) out of routing until you opt in.</summary>
+    public bool? Enabled { get; set; }
+    public Dictionary<string, string>? Headers { get; set; }
+    /// <summary>OpenAI's newer models reject <c>max_tokens</c>; true renames it.</summary>
+    public bool? UseMaxCompletionTokens { get; set; }
+}
+
 /// <summary>One catalog entry. Tier is your quality belief: 1 economy, 2 standard, 3 frontier.</summary>
 public sealed class ModelSpec
 {

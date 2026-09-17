@@ -37,6 +37,9 @@ public static class Env
         return false;
     }
 
+    /// <summary>Variables that Load() itself added, so the CLI wrappers can keep them from child processes.</summary>
+    public static readonly List<string> LoadedFromEnvFile = [];
+
     internal static void Apply(IEnumerable<string> lines)
     {
         foreach (var raw in lines)
@@ -56,7 +59,10 @@ public static class Env
                 if (hash >= 0) value = value[..hash].TrimEnd();
             }
             if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+            {
                 Environment.SetEnvironmentVariable(key, value);
+                LoadedFromEnvFile.Add(key);
+            }
         }
     }
 
